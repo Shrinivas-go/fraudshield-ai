@@ -5,6 +5,12 @@ import joblib
 # To run in Google Colab, uncomment the lines below to mount Google Drive:
 # from google.colab import drive
 # drive.mount('/content/drive')
+#
+# NOTE FOR COLAB NOTEBOOKS (INTERACTIVE CELLS):
+# If you copy-paste this code directly into a Colab notebook cell rather than running
+# it as a .py script, the __file__ variable will not be defined. In that case, you must:
+# 1. Comment out the lines using __file__ in `data_paths` (under Step 1) and use strings instead.
+# 2. Comment out the `ml_dir = os.path.dirname(__file__)` line (under Save main model) and replace with `ml_dir = "."`.
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -33,6 +39,8 @@ def train():
 
     #  1. Load dataset
     # Look for dataset
+    # NOTE FOR COLAB NOTEBOOK CELLS: If you get a NameError on '__file__', comment out
+    # the two paths using __file__ below and use the relative/absolute string paths.
     data_paths = [
         os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "data", "credit_card_fraud_10k.csv"),
         os.path.join(os.path.dirname(__file__), "..", "..", "data", "credit_card_fraud_10k.csv"),
@@ -136,6 +144,8 @@ def train():
         print(f"   {name:30s} {imp:.4f} {bar}")
 
     # Save main model
+    # NOTE FOR COLAB NOTEBOOK CELLS: If you get a NameError on '__file__', comment out
+    # the line below and use `ml_dir = "."` instead.
     ml_dir = os.path.dirname(__file__)
     model_path = os.path.join(ml_dir, "model.pkl")
     joblib.dump({
