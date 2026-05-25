@@ -1,6 +1,10 @@
 import os
 import sys
 import joblib
+
+from google.colab import drive
+drive.mount('/content/drive')
+
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -10,7 +14,7 @@ from sklearn.metrics import (
     f1_score, confusion_matrix, classification_report
 )
 
-# Handle SMOTE import 
+# Handle SMOTE import
 try:
     from imblearn.over_sampling import SMOTE
     HAS_SMOTE = True
@@ -26,12 +30,9 @@ def train():
     print("Fraud Detection Model Training Pipeline")
     print("=" * 60)
 
-    data_paths = [
-        os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "data", "credit_card_fraud_10k.csv"),
-        os.path.join(os.path.dirname(__file__), "..", "..", "data", "credit_card_fraud_10k.csv"),
-        "data/credit_card_fraud_10k.csv",
-        "../data/credit_card_fraud_10k.csv",
-    ]
+
+    #  1. Load dataset
+    data_paths = ["/content/drive/MyDrive/credit_card_fraud_10k.csv"]
 
     df = None
     for path in data_paths:
@@ -50,7 +51,7 @@ def train():
     print(f"Dataset shape: {df.shape}")
     print(f"Fraud distribution:\n{df['is_fraud'].value_counts().to_string()}")
 
-    # 2. Feature Engineering 
+    # 2. Feature Engineering
     print("\nEngineering features...")
 
     # Drop non-feature columns
@@ -73,14 +74,14 @@ def train():
     X = feature_df.values
     y = df["is_fraud"].values
 
-    # 3. Train/Test Split 
+    # 3. Train/Test Split
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
     print(f"\nTrain set: {X_train.shape[0]} samples")
     print(f"Test set:  {X_test.shape[0]} samples")
 
-    # 4. Handle Class Imbalance with SMOTE 
+    # 4. Handle Class Imbalance with SMOTE
     if HAS_SMOTE:
         print("\nApplying SMOTE to balance classes...")
         smote = SMOTE(random_state=42)
@@ -90,7 +91,7 @@ def train():
     else:
         X_train_balanced, y_train_balanced = X_train, y_train
 
-    # 5. Train Main Model (RandomForest) 
+    # 5. Train Main Model (RandomForest)
     print("\nTraining RandomForest classifier...")
     rf_model = RandomForestClassifier(
         n_estimators=100,
@@ -124,8 +125,9 @@ def train():
     for name, imp in importances:
         bar = "|" * int(imp * 100)
         print(f"   {name:30s} {imp:.4f} {bar}")
-        
-    ml_dir = os.path.dirname(__file__)
+
+    # Save main model
+    ml_dir = "."
     model_path = os.path.join(ml_dir, "model.pkl")
     joblib.dump({
         "model": rf_model,
@@ -136,7 +138,7 @@ def train():
     }, model_path)
     print(f"\nMain model saved to: {model_path}")
 
-    # ── Summary 
+    # Summary
     print("\n" + "=" * 60)
     print("Training Complete!")
     print("=" * 60)
