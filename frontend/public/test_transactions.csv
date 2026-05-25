@@ -1,0 +1,11 @@
+amount,transaction_hour,merchant_category,foreign_transaction,location_mismatch,device_trust_score,velocity_last_24h,cardholder_age
+12500,1,Electronics,1,1,18,14,22
+85.50,10,Grocery,0,0,88,2,45
+3200,2,Travel,1,1,32,9,30
+45.00,14,Food,0,0,92,1,38
+8900,0,Electronics,1,0,25,11,19
+150.00,16,Clothing,0,0,78,3,52
+6700,3,Travel,1,1,12,15,25
+220.00,11,Grocery,0,0,85,2,60
+4500,23,Electronics,1,1,22,8,27
+35.00,9,Food,0,0,95,1,41

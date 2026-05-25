@@ -1,0 +1,20 @@
+{
+  "name": "fraudshield-ai",
+  "version": "1.0.0",
+  "description": "Monorepo for FraudShield AI - Real-time Machine Learning Fraud Detection System",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "install:all": "npm install && pip install -r backend/requirements.txt",
+    "dev": "concurrently --kill-others \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "python backend/app.py",
+    "build:frontend": "npm run build --workspace=frontend",
+    "start:backend": "gunicorn --chdir backend app:app"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

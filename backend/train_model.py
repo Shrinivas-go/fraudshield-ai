@@ -1,0 +1,156 @@
+import os
+import sys
+import joblib
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score,
+    f1_score, confusion_matrix, classification_report
+)
+
+# Handle SMOTE import 
+try:
+    from imblearn.over_sampling import SMOTE
+    HAS_SMOTE = True
+except ImportError:
+    HAS_SMOTE = False
+    print("imbalanced-learn not installed. Training without SMOTE.")
+    print("   Install with: pip install imbalanced-learn")
+
+
+def train():
+    # Main Training
+    print("=" * 60)
+    print("Fraud Detection Model Training Pipeline")
+    print("=" * 60)
+
+
+    #  1. Load dataset
+    # Look for dataset
+    data_paths = [
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "data", "credit_card_fraud_10k.csv"),
+        os.path.join(os.path.dirname(__file__), "..", "..", "data", "credit_card_fraud_10k.csv"),
+        "data/credit_card_fraud_10k.csv",
+        "../data/credit_card_fraud_10k.csv",
+    ]
+
+    df = None
+    for path in data_paths:
+        abs_path = os.path.abspath(path)
+        if os.path.exists(abs_path):
+            df = pd.read_csv(abs_path)
+            print(f"Loaded dataset from: {abs_path}")
+            break
+
+    if df is None:
+        print("Dataset not found! Tried paths:")
+        for p in data_paths:
+            print(f"   - {os.path.abspath(p)}")
+        sys.exit(1)
+
+    print(f"Dataset shape: {df.shape}")
+    print(f"Fraud distribution:\n{df['is_fraud'].value_counts().to_string()}")
+
+    # 2. Feature Engineering 
+    print("\nEngineering features...")
+
+    # Drop non-feature columns
+    feature_df = df.drop(columns=["transaction_id", "is_fraud"])
+
+    # One-hot encode merchant_category
+    feature_df = pd.get_dummies(feature_df, columns=["merchant_category"], dtype=int)
+
+    # Add placeholder behavioral features
+    # During training, we use zeros as the model learns from the base features
+    feature_df["avg_amount"] = 0.0
+    feature_df["tx_freq_1h"] = 0
+    feature_df["tx_freq_24h"] = 0
+    feature_df["unusual_location"] = 0
+
+    # Store feature column names (critical for prediction-time column ordering)
+    feature_columns = list(feature_df.columns)
+    print(f"Features ({len(feature_columns)}): {feature_columns}")
+
+    X = feature_df.values
+    y = df["is_fraud"].values
+
+    # 3. Train/Test Split 
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+    print(f"\nTrain set: {X_train.shape[0]} samples")
+    print(f"Test set:  {X_test.shape[0]} samples")
+
+    # 4. Handle Class Imbalance with SMOTE 
+    if HAS_SMOTE:
+        print("\nApplying SMOTE to balance classes...")
+        smote = SMOTE(random_state=42)
+        X_train_balanced, y_train_balanced = smote.fit_resample(X_train, y_train)
+        print(f"   Before SMOTE: {np.bincount(y_train)}")
+        print(f"   After SMOTE:  {np.bincount(y_train_balanced)}")
+    else:
+        X_train_balanced, y_train_balanced = X_train, y_train
+
+    # ── 5. Train Main Model (RandomForest) 
+    print("\nTraining RandomForest classifier...")
+    rf_model = RandomForestClassifier(
+        n_estimators=100,
+        max_depth=15,
+        min_samples_split=5,
+        min_samples_leaf=2,
+        random_state=42,
+        n_jobs=-1,
+        class_weight="balanced"  # Additional class weight handling
+    )
+    rf_model.fit(X_train_balanced, y_train_balanced)
+
+    # Evaluate
+    y_pred = rf_model.predict(X_test)
+    y_prob = rf_model.predict_proba(X_test)[:, 1]
+
+    print("\n" + "=" * 60)
+    print("MAIN MODEL — RandomForest Results")
+    print("=" * 60)
+    print(f"Accuracy:  {accuracy_score(y_test, y_pred):.4f}")
+    print(f"Precision: {precision_score(y_test, y_pred, zero_division=0):.4f}")
+    print(f"Recall:    {recall_score(y_test, y_pred, zero_division=0):.4f}")
+    print(f"F1-Score:  {f1_score(y_test, y_pred, zero_division=0):.4f}")
+    print(f"\nConfusion Matrix:\n{confusion_matrix(y_test, y_pred)}")
+    print(f"\nClassification Report:\n{classification_report(y_test, y_pred, zero_division=0)}")
+
+    # Feature importances
+    print("\nFeature Importances:")
+    importances = list(zip(feature_columns, rf_model.feature_importances_))
+    importances.sort(key=lambda x: x[1], reverse=True)
+    for name, imp in importances:
+        bar = "|" * int(imp * 100)
+        print(f"   {name:30s} {imp:.4f} {bar}")
+
+    # Save main model
+    ml_dir = os.path.dirname(__file__)
+    model_path = os.path.join(ml_dir, "model.pkl")
+    joblib.dump({
+        "model": rf_model,
+        "feature_columns": feature_columns,
+        "training_samples": len(X_train_balanced),
+        "test_accuracy": accuracy_score(y_test, y_pred),
+        "test_f1": f1_score(y_test, y_pred, zero_division=0)
+    }, model_path)
+    print(f"\nMain model saved to: {model_path}")
+
+    # ── Summary 
+    print("\n" + "=" * 60)
+    print("Training Complete!")
+    print("=" * 60)
+    print(f"   Model:       {model_path}")
+    print(f"   Features:    {len(feature_columns)}")
+    print(f"   Accuracy:    {accuracy_score(y_test, y_pred):.4f}")
+    print(f"   F1-Score:    {f1_score(y_test, y_pred, zero_division=0):.4f}")
+    print("\n   Next step: cd backend && python app.py")
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    train()
