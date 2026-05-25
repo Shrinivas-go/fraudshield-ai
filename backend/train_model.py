@@ -1,6 +1,10 @@
 import os
 import sys
 import joblib
+
+# To run in Google Colab, uncomment the lines below to mount Google Drive:
+# from google.colab import drive
+# drive.mount('/content/drive')
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -34,6 +38,9 @@ def train():
         os.path.join(os.path.dirname(__file__), "..", "..", "data", "credit_card_fraud_10k.csv"),
         "data/credit_card_fraud_10k.csv",
         "../data/credit_card_fraud_10k.csv",
+        # Google Colab specific paths
+        "/content/drive/MyDrive/credit_card_fraud_10k.csv",
+        "/content/credit_card_fraud_10k.csv",
     ]
 
     df = None
