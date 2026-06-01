@@ -5,6 +5,7 @@ import ComicStory from './components/ComicStory'
 import AnalyzePage from './components/AnalyzePage'
 import Footer from './components/Footer'
 import AuthModal from './components/AuthModal'
+import EngineStatus from './components/EngineStatus'
 import { AuthProvider } from './components/AuthContext'
 
 export default function App() {
@@ -209,6 +210,7 @@ export default function App() {
         </main>
         <Footer />
         <AuthModal />
+        <EngineStatus />
       </div>
     </AuthProvider>
   )
