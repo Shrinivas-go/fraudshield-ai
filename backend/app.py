@@ -35,7 +35,7 @@ FEATURE_COLUMNS = model_bundle["feature_columns"]
 print(f"[FraudShield] Model loaded — {len(FEATURE_COLUMNS)} features")
 
 # ── SQLite user database ────────────────────────────────────
-DB_PATH = os.environ.get("SQLITE_DB_PATH", os.path.join(MODEL_DIR, "users.db"))
+DB_PATH = os.path.join(MODEL_DIR, "users.db")
 
 
 def get_db():
@@ -45,10 +45,6 @@ def get_db():
 
 
 def init_db():
-    # Make sure parent directory exists if a custom path is provided
-    db_dir = os.path.dirname(os.path.abspath(DB_PATH))
-    os.makedirs(db_dir, exist_ok=True)
-
     conn = get_db()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -61,7 +57,7 @@ def init_db():
     """)
     conn.commit()
     conn.close()
-    print(f"[FraudShield] SQLite database ready at {DB_PATH}")
+    print("[FraudShield] SQLite database ready")
 
 
 init_db()
