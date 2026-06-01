@@ -1,0 +1,10 @@
+.git
+.gitignore
+node_modules
+**/node_modules
+frontend
+backend/__pycache__
+backend/*.pyc
+backend/users.db
+.env
+README.md
