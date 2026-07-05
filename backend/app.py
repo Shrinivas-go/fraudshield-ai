@@ -18,9 +18,10 @@ from collections import defaultdict
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "fraudshield-demo-secret-key-2026")
 
-# Restrict CORS origin to the React development server or the same origin in production
+# Allow multiple origins separated by commas and strip trailing slashes to prevent common config errors
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
-CORS(app, resources={r"/api/*": {"origins": [FRONTEND_URL]}})
+allowed_origins = [url.strip().rstrip("/") for url in FRONTEND_URL.split(",") if url.strip()]
+CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
 
 # ── Load trained model ──────────────────────────────────────
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
