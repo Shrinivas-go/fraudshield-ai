@@ -2,29 +2,25 @@ import os
 import io
 import uuid
 import sqlite3
-import hashlib
+import time
+import re
 import joblib
 import numpy as np
 import pandas as pd
-from flask import Flask, request, jsonify, session, make_response, send_from_directory
+from functools import wraps
+from flask import Flask, request, jsonify, make_response, send_from_directory, g
 from flask_cors import CORS
+from werkzeug.security import generate_password_hash, check_password_hash
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
+from collections import defaultdict
 
 # ── App setup ───────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "fraudshield-demo-secret-key-2026")
-CORS(app)
 
-
-# Explicit preflight handler for all /api/* routes
-@app.before_request
-def handle_preflight():
-    if request.method == "OPTIONS":
-        response = make_response()
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-        response.headers["Access-Control-Max-Age"] = "3600"
-        return response
+# Restrict CORS origin to the React development server or the same origin in production
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+CORS(app, resources={r"/api/*": {"origins": [FRONTEND_URL]}})
 
 # ── Load trained model ──────────────────────────────────────
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -62,15 +58,74 @@ def init_db():
 
 init_db()
 
+# ── Security Helpers ────────────────────────────────────────
 
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+# Simple in-memory IP-based rate limiter
+rate_limit_records = defaultdict(list)
 
 
-# ── Helpers ─────────────────────────────────────────────────
+def rate_limit(limit=60, window=60):
+    """
+    In-memory rate limiter decorator.
+    limit: max requests allowed within window
+    window: time frame in seconds
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            ip = request.remote_addr
+            now = time.time()
+            # Retain only timestamps within the current window
+            rate_limit_records[ip] = [t for t in rate_limit_records[ip] if now - t < window]
+            
+            if len(rate_limit_records[ip]) >= limit:
+                return jsonify({"detail": "Too many requests. Please try again later."}), 429
+                
+            rate_limit_records[ip].append(now)
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+
+def generate_auth_token(user_id):
+    """Generate a secure cryptographically signed token."""
+    serializer = URLSafeTimedSerializer(app.secret_key)
+    return serializer.dumps({"user_id": user_id}, salt="auth-salt")
+
+
+def verify_auth_token(token):
+    """Verify and decode the auth token."""
+    serializer = URLSafeTimedSerializer(app.secret_key)
+    try:
+        # Token valid for 24 hours
+        data = serializer.loads(token, salt="auth-salt", max_age=86400)
+        return data["user_id"]
+    except (SignatureExpired, BadSignature):
+        return None
+
+
+def login_required(f):
+    """Decorator to protect routes requiring authentication."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"detail": "Authentication token is missing or invalid"}), 401
+        
+        token = auth_header.split(" ")[1]
+        user_id = verify_auth_token(token)
+        if not user_id:
+            return jsonify({"detail": "Authentication token is expired or invalid"}), 401
+            
+        g.user_id = user_id
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+# ── Domain Helpers & Mapping ────────────────────────────────
 MERCHANT_CATEGORIES = ["Clothing", "Electronics", "Food", "Grocery", "Travel"]
+EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
-# Human-readable feature explanations
 FEATURE_EXPLANATIONS = {
     "foreign_transaction": {
         "name": "Foreign Transaction",
@@ -109,7 +164,6 @@ FEATURE_EXPLANATIONS = {
     },
 }
 
-# Thresholds for "high" vs "low" explanations
 RISK_THRESHOLDS = {
     "foreign_transaction": lambda v: v == 1,
     "device_trust_score": lambda v: v < 40,
@@ -119,6 +173,87 @@ RISK_THRESHOLDS = {
     "amount": lambda v: v >= 3000,
     "cardholder_age": lambda v: v <= 25,
 }
+
+
+def validate_transaction_data(data):
+    """
+    Validate the structure and values of an incoming transaction request.
+    Returns a list of error messages, or an empty list if valid.
+    """
+    errors = []
+    
+    required = [
+        "amount", "transaction_hour", "merchant_category",
+        "foreign_transaction", "location_mismatch",
+        "device_trust_score", "velocity_last_24h", "cardholder_age",
+    ]
+    missing = [f for f in required if f not in data]
+    if missing:
+        errors.append(f"Missing required fields: {', '.join(missing)}")
+        return errors
+
+    # Validate amount
+    try:
+        amount = float(data.get("amount"))
+        if amount < 0:
+            errors.append("Amount must be a non-negative number")
+    except (ValueError, TypeError):
+        errors.append("Amount must be a valid number")
+        
+    # Validate transaction_hour
+    try:
+        hour = int(data.get("transaction_hour"))
+        if not (0 <= hour <= 23):
+            errors.append("Transaction hour must be between 0 and 23")
+    except (ValueError, TypeError):
+        errors.append("Transaction hour must be an integer between 0 and 23")
+        
+    # Validate device_trust_score
+    try:
+        score = int(data.get("device_trust_score"))
+        if not (0 <= score <= 100):
+            errors.append("Device trust score must be between 0 and 100")
+    except (ValueError, TypeError):
+        errors.append("Device trust score must be an integer between 0 and 100")
+        
+    # Validate velocity_last_24h
+    try:
+        velocity = int(data.get("velocity_last_24h"))
+        if velocity < 0:
+            errors.append("Velocity must be a non-negative integer")
+    except (ValueError, TypeError):
+        errors.append("Velocity must be a valid integer")
+        
+    # Validate cardholder_age
+    try:
+        age = int(data.get("cardholder_age"))
+        if not (18 <= age <= 120):
+            errors.append("Cardholder age must be between 18 and 120")
+    except (ValueError, TypeError):
+        errors.append("Cardholder age must be an integer between 18 and 120")
+        
+    # Validate foreign_transaction
+    try:
+        ft = int(data.get("foreign_transaction"))
+        if ft not in [0, 1]:
+            errors.append("Foreign transaction must be 0 or 1")
+    except (ValueError, TypeError):
+        errors.append("Foreign transaction must be 0 or 1")
+        
+    # Validate location_mismatch
+    try:
+        lm = int(data.get("location_mismatch"))
+        if lm not in [0, 1]:
+            errors.append("Location mismatch must be 0 or 1")
+    except (ValueError, TypeError):
+        errors.append("Location mismatch must be 0 or 1")
+        
+    # Validate merchant_category
+    category = data.get("merchant_category")
+    if category not in MERCHANT_CATEGORIES:
+        errors.append(f"Merchant category must be one of: {', '.join(MERCHANT_CATEGORIES)}")
+        
+    return errors
 
 
 def generate_explanation(data: dict, risk_level: str, prob: float) -> dict:
@@ -250,6 +385,7 @@ def predict_single(data: dict) -> dict:
 
 # ── Auth Routes ─────────────────────────────────────────────
 @app.route("/api/auth/signup", methods=["POST"])
+@rate_limit(limit=5, window=60)
 def signup():
     data = request.get_json(force=True)
     name = data.get("name", "").strip()
@@ -258,21 +394,24 @@ def signup():
 
     if not email or not password:
         return jsonify({"detail": "Email and password are required"}), 400
+    if not EMAIL_REGEX.match(email):
+        return jsonify({"detail": "Invalid email address format"}), 400
     if len(password) < 6:
         return jsonify({"detail": "Password must be at least 6 characters"}), 400
 
     display_name = name or email.split("@")[0]
-    pw_hash = hash_password(password)
+    pw_hash = generate_password_hash(password)
     created = pd.Timestamp.now().isoformat()
 
     conn = None
     try:
         conn = get_db()
-        conn.execute(
+        cursor = conn.execute(
             "INSERT INTO users (name, email, password_hash, created_at) VALUES (?, ?, ?, ?)",
             (display_name, email, pw_hash, created),
         )
         conn.commit()
+        user_id = cursor.lastrowid
     except sqlite3.IntegrityError:
         return jsonify({"detail": "An account with this email already exists"}), 409
     except Exception as e:
@@ -281,13 +420,17 @@ def signup():
         if conn:
             conn.close()
 
+    token = generate_auth_token(user_id)
+
     return jsonify({
         "user": {"name": display_name, "email": email},
+        "token": token,
         "message": "Account created successfully",
     })
 
 
 @app.route("/api/auth/login", methods=["POST"])
+@rate_limit(limit=10, window=60)
 def login():
     data = request.get_json(force=True)
     email = data.get("email", "").strip().lower()
@@ -306,43 +449,44 @@ def login():
         if conn:
             conn.close()
 
-    if not user or user["password_hash"] != hash_password(password):
+    if not user or not check_password_hash(user["password_hash"], password):
         return jsonify({"detail": "Invalid email or password"}), 401
+
+    token = generate_auth_token(user["id"])
 
     return jsonify({
         "user": {"name": user["name"], "email": user["email"]},
+        "token": token,
         "message": "Login successful",
     })
 
 
 # ── Prediction Routes ──────────────────────────────────────
 @app.route("/api/demo/predict", methods=["POST"])
+@login_required
 def api_predict():
     """Single transaction prediction."""
     data = request.get_json(force=True)
 
-    required = [
-        "amount", "transaction_hour", "merchant_category",
-        "foreign_transaction", "location_mismatch",
-        "device_trust_score", "velocity_last_24h", "cardholder_age",
-    ]
-    missing = [f for f in required if f not in data]
-    if missing:
+    validation_errors = validate_transaction_data(data)
+    if validation_errors:
         return jsonify({
             "detail": {
-                "error": "Missing required fields",
-                "missing_columns": missing,
+                "error": "Validation failed",
+                "messages": validation_errors
             }
-        }), 422
+        }), 400
 
     try:
         result = predict_single(data)
         return jsonify(result)
     except Exception as e:
-        return jsonify({"detail": str(e)}), 500
+        return jsonify({"detail": f"Prediction error: {str(e)}"}), 500
 
 
 @app.route("/api/demo/upload-csv", methods=["POST"])
+@login_required
+@rate_limit(limit=10, window=60)
 def api_upload_csv():
     """Batch CSV upload and prediction."""
     if "file" not in request.files:
@@ -365,7 +509,20 @@ def api_upload_csv():
     for idx, row_data in df.iterrows():
         try:
             data = row_data.to_dict()
-            result = predict_single(data)
+            
+            # Cast common columns to avoid strict type mismatch during dict conversion
+            sanitized_data = {
+                "amount": float(data.get("amount", 0)),
+                "transaction_hour": int(data.get("transaction_hour", 0)),
+                "merchant_category": str(data.get("merchant_category", "Electronics")),
+                "foreign_transaction": int(data.get("foreign_transaction", 0)),
+                "location_mismatch": int(data.get("location_mismatch", 0)),
+                "device_trust_score": int(data.get("device_trust_score", 50)),
+                "velocity_last_24h": int(data.get("velocity_last_24h", 0)),
+                "cardholder_age": int(data.get("cardholder_age", 30))
+            }
+            
+            result = predict_single(sanitized_data)
             predictions.append({
                 "row_index": int(idx),
                 "transaction_id": result["transaction_id"],
@@ -398,55 +555,7 @@ def health():
     return jsonify({"status": "ok", "model_features": len(FEATURE_COLUMNS)})
 
 
-@app.route("/api/demo/analyze-csv", methods=["POST"])
-def api_analyze_csv_text():
-    """Batch CSV analysis — accepts CSV content as plain text body (no file upload)."""
-    try:
-        content = request.get_data(as_text=True)
-        if not content or not content.strip():
-            return jsonify({"detail": "No CSV content provided"}), 400
-
-        df = pd.read_csv(io.StringIO(content))
-    except Exception as e:
-        return jsonify({"detail": f"Failed to parse CSV: {e}"}), 400
-
-    predictions = []
-    successful = 0
-    failed = 0
-
-    for idx, row_data in df.iterrows():
-        try:
-            data = row_data.to_dict()
-            result = predict_single(data)
-            predictions.append({
-                "row_index": int(idx),
-                "transaction_id": result["transaction_id"],
-                "fraud_probability": result["fraud_probability"],
-                "risk_level": result["risk_level"],
-                "input_data": result["input_data"],
-                "explainability": result["explainability"],
-                "explanation": result["explanation"],
-                "status": "success",
-            })
-            successful += 1
-        except Exception as e:
-            predictions.append({
-                "row_index": int(idx),
-                "status": "error",
-                "error": str(e),
-            })
-            failed += 1
-
-    return jsonify({
-        "total_rows": len(df),
-        "successful": successful,
-        "failed": failed,
-        "predictions": predictions,
-    })
-
-
 # ── Serve Frontend in Production ────────────────────────────
-# When frontend is built, it lives in frontend/dist.
 FRONTEND_DIST = os.path.abspath(os.path.join(MODEL_DIR, "../frontend/dist"))
 
 @app.route("/", defaults={"path": ""})
@@ -455,7 +564,6 @@ def serve_frontend(path):
     if path != "" and os.path.exists(os.path.join(FRONTEND_DIST, path)):
         return send_from_directory(FRONTEND_DIST, path)
     else:
-        # For single page application (SPA) routing, fall back to index.html
         if os.path.exists(os.path.join(FRONTEND_DIST, "index.html")):
             return send_from_directory(FRONTEND_DIST, "index.html")
         else:

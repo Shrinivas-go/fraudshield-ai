@@ -28,6 +28,7 @@ export function AuthProvider({ children }) {
       if (!res.ok) throw new Error(data.detail || 'Login failed')
       setUser(data.user)
       localStorage.setItem('fraudshield_user', JSON.stringify(data.user))
+      localStorage.setItem('fraudshield_token', data.token)
       setShowAuthModal(false)
       return { success: true }
     } catch (e) {
@@ -49,6 +50,7 @@ export function AuthProvider({ children }) {
       if (!res.ok) throw new Error(data.detail || 'Signup failed')
       setUser(data.user)
       localStorage.setItem('fraudshield_user', JSON.stringify(data.user))
+      localStorage.setItem('fraudshield_token', data.token)
       setShowAuthModal(false)
       return { success: true }
     } catch (e) {
@@ -61,6 +63,7 @@ export function AuthProvider({ children }) {
   const logout = () => {
     setUser(null)
     localStorage.removeItem('fraudshield_user')
+    localStorage.removeItem('fraudshield_token')
   }
 
   return (

@@ -28,6 +28,9 @@ const SAMPLE_DATA = [
 function parseError(d) {
   if (typeof d.detail === 'string') return d.detail
   if (d.detail?.message) return d.detail.message
+  if (d.detail?.error === 'Validation failed' && Array.isArray(d.detail.messages)) {
+    return d.detail.messages.join(', ')
+  }
   if (d.detail?.error) return d.detail.error + (d.detail.missing_columns ? ': ' + d.detail.missing_columns.join(', ') : '')
   return JSON.stringify(d.detail || d)
 }
@@ -79,12 +82,28 @@ export default function AnalyzePage() {
 
   const handlePredict = async (transaction) => {
     setLoading(true); setError('')
+    const token = localStorage.getItem('fraudshield_token')
+    if (!token) {
+      setShowAuthModal(true)
+      setLoading(false)
+      setError('Please log in to analyze transactions.')
+      return
+    }
     try {
       const res = await fetch(`${API_BASE}/predict`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(transaction),
       })
+      if (res.status === 401) {
+        localStorage.removeItem('fraudshield_user')
+        localStorage.removeItem('fraudshield_token')
+        setShowAuthModal(true)
+        throw new Error('Your session has expired. Please log in again.')
+      }
       if (!res.ok) { const d = await res.json(); throw new Error(parseError(d)) }
       const data = await res.json()
       setResults(prev => [data, ...prev])
@@ -106,14 +125,29 @@ export default function AnalyzePage() {
     const file = selectedFile || fileRef.current?.files?.[0]
     if (!file) { setError('Please select a CSV file first.'); return }
     setLoading(true); setError(''); setCsvStats(null)
+    const token = localStorage.getItem('fraudshield_token')
+    if (!token) {
+      setShowAuthModal(true)
+      setLoading(false)
+      setError('Please log in to upload CSV data.')
+      return
+    }
     try {
-      // Read user file as text, then create a Blob+File — same as handleSampleAnalyze
-      const csvText = await file.text()
-      const blob = new Blob([csvText], { type: 'text/csv' })
-      const csvFile = new File([blob], file.name, { type: 'text/csv' })
       const form = new FormData()
-      form.append('file', csvFile)
-      const res = await fetch(`${API_BASE}/upload-csv`, { method: 'POST', body: form })
+      form.append('file', file)
+      const res = await fetch(`${API_BASE}/upload-csv`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: form
+      })
+      if (res.status === 401) {
+        localStorage.removeItem('fraudshield_user')
+        localStorage.removeItem('fraudshield_token')
+        setShowAuthModal(true)
+        throw new Error('Your session has expired. Please log in again.')
+      }
       if (!res.ok) { const d = await res.json(); throw new Error(parseError(d)) }
       const data = await res.json()
       const mapped = data.predictions.filter(p => p.status === 'success').map(p => ({
@@ -142,6 +176,13 @@ export default function AnalyzePage() {
 
   const handleSampleAnalyze = async () => {
     setLoading(true); setError(''); setCsvStats(null)
+    const token = localStorage.getItem('fraudshield_token')
+    if (!token) {
+      setShowAuthModal(true)
+      setLoading(false)
+      setError('Please log in to run sample analysis.')
+      return
+    }
     try {
       const header = Object.keys(SAMPLE_DATA[0]).join(',')
       const rows = SAMPLE_DATA.map(r => Object.values(r).join(','))
@@ -150,7 +191,19 @@ export default function AnalyzePage() {
       const file = new File([blob], 'sample_transactions.csv', { type: 'text/csv' })
       const form = new FormData()
       form.append('file', file)
-      const res = await fetch(`${API_BASE}/upload-csv`, { method: 'POST', body: form })
+      const res = await fetch(`${API_BASE}/upload-csv`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: form
+      })
+      if (res.status === 401) {
+        localStorage.removeItem('fraudshield_user')
+        localStorage.removeItem('fraudshield_token')
+        setShowAuthModal(true)
+        throw new Error('Your session has expired. Please log in again.')
+      }
       if (!res.ok) { const d = await res.json(); throw new Error(parseError(d)) }
       const data = await res.json()
       const mapped = data.predictions.filter(p => p.status === 'success').map(p => ({

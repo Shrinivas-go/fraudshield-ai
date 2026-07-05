@@ -27,10 +27,10 @@ def train():
     print("=" * 60)
 
     data_paths = [
-        os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "data", "credit_card_fraud_10k.csv"),
-        os.path.join(os.path.dirname(__file__), "..", "..", "data", "credit_card_fraud_10k.csv"),
-        "data/credit_card_fraud_10k.csv",
-        "../data/credit_card_fraud_10k.csv",
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "dataset", "credit_card_fraud_10k.csv"),
+        os.path.join(os.path.dirname(__file__), "..", "..", "dataset", "credit_card_fraud_10k.csv"),
+        "dataset/credit_card_fraud_10k.csv",
+        "../dataset/credit_card_fraud_10k.csv",
     ]
 
     df = None
