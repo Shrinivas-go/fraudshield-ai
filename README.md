@@ -1,81 +1,157 @@
 # FraudShield AI 🛡️🤖
 
-Welcome to **FraudShield AI**, a real-time Machine Learning-powered Fraud Detection System. This repository is structured as a unified **monorepo** containing both the React-based frontend application and the Flask-based Machine Learning backend.
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
+![React](https://img.shields.io/badge/react-19.2-61dafb.svg)
+![Flask](https://img.shields.io/badge/flask-latest-black.svg)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-latest-orange.svg)
 
----
+## 📌 Overview
+**FraudShield AI** is a real-time, Machine Learning-powered Fraud Detection System designed to analyze financial transactions and identify suspicious activities. Financial institutions process millions of transactions daily, making manual review impossible. FraudShield AI solves this problem by using a trained Random Forest model to instantly evaluate transactions, flag high-risk behaviors, and provide human-readable explanations (Explainable AI) for its decisions. 
 
-## 📂 Repository Structure
+## ✨ Features
+- **Real-Time Fraud Prediction**: Instantly evaluates individual transactions and returns a fraud probability score and risk level (Low, Medium, High).
+- **Explainable AI (XAI)**: Generates human-readable explanations detailing exactly *why* a transaction was flagged (e.g., location mismatch, unusual time, suspicious device trust score).
+- **Batch Processing**: Supports CSV uploads for bulk transaction analysis.
+- **Secure User Authentication**: Custom built JWT-style token authentication using cryptographically signed tokens.
+- **Rate Limiting**: Built-in IP-based rate limiting to prevent API abuse and brute-force attacks.
+- **Interactive Dashboard**: Modern, responsive React SPA with dynamic charts and visualizations using ECharts.
+- **Unified Production Deployment**: Streamlined architecture where the Flask backend serves the compiled React frontend, eliminating CORS issues in production.
 
-The project is organized as follows:
-- **`/backend`**: Python Flask API that loads the trained machine learning model (`model.pkl`), performs real-time transaction evaluations, manages SQLite authentication database (`users.db`), and handles CSV batch uploads.
-- **`/frontend`**: React SPA built with Vite, Tailwind CSS v4, and ECharts for vibrant, dynamic fraud analytics and real-time simulations.
-- **`/dataset`**: Contains credit card transaction sample data used for demonstration and model testing.
+## 💻 Tech Stack
 
----
+### Frontend
+- React (v19)
+- Vite
+- Tailwind CSS (v4)
+- ECharts (Data Visualization)
 
-## 🛠️ Quick Start & Local Setup
+### Backend
+- Python (Flask)
+- Flask-CORS
+- Werkzeug & ItsDangerous (Security/Auth)
+
+### Database
+- SQLite (Local development and lightweight data storage)
+
+### Machine Learning
+- scikit-learn (Random Forest Classifier)
+- Pandas & NumPy (Data Processing)
+- imbalanced-learn
+- Joblib (Model serialization)
+
+### Deployment & Tools
+- Node.js & npm
+- Gunicorn (Production WSGI server)
+- Git & GitHub
+
+## 🏗️ Architecture
+The system follows a standard modern client-server architecture with an integrated ML inference pipeline.
+
+**User → React Frontend → REST API (Flask) → Feature Engineering → Random Forest Model (scikit-learn) → Response with Explainability → React Dashboard**
+
+1. The user authenticates and submits transaction data via the React frontend.
+2. The Flask backend validates the input and rate-limits the request if necessary.
+3. The data is transformed into a feature vector matching the model's expected format.
+4. The pre-trained Random Forest model predicts the probability of fraud.
+5. The backend analyzes the feature importances to generate a human-readable explanation.
+6. Results are stored in the database (if applicable) and returned to the frontend dashboard.
+
+## 📂 Folder Structure
+
+```text
+fraudshield-ai/
+├── backend/                # Flask API and Machine Learning inference code
+│   ├── app.py              # Main Flask application and API routes
+│   ├── model.pkl           # Serialized Random Forest model
+│   └── train_model.py      # Script used to train and export the ML model
+├── frontend/               # React Single Page Application (SPA)
+│   ├── src/                # React components, styles, and utilities
+│   └── package.json        # Frontend dependencies
+├── dataset/                # Sample datasets for testing and demonstration
+├── package.json            # Root configuration for monorepo script execution
+└── README.md               # Project documentation
+```
+
+## 🚀 Installation & Local Setup
 
 ### Prerequisites
-1. **Node.js** (v18+) and **npm**
-2. **Python** (3.8+) and **pip**
+- Node.js (v18+)
+- Python (3.8+)
+- pip & npm
 
-### 1. Installation
-Install all dependencies for both the frontend workspace and the Python backend in a single step from the root directory:
+### 1. Clone the Repository
 ```bash
+git clone https://github.com/YOUR_USERNAME/fraudshield-ai.git
+cd fraudshield-ai
+```
+
+### 2. Install Dependencies
+Install both frontend and backend dependencies in a single step from the root directory:
+```bash
+# We recommend creating and activating a Python virtual environment first
 npm run install:all
 ```
 
-*Note: You may want to activate your Python virtual environment (`venv`) before running this command if you prefer to keep Python dependencies isolated.*
-
-### 2. Local Development Run
-Start both the React development server and the Flask API concurrently:
+### 3. Run the Development Servers
+Start both the React frontend and Flask backend concurrently:
 ```bash
 npm run dev
 ```
-- **React Frontend**: Runs on [http://localhost:5173](http://localhost:5173)
-- **Flask API**: Runs on [http://localhost:5000](http://localhost:5000)
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:5000`
 
-*Vite is configured to automatically proxy `/api` requests to `http://localhost:5000` during local development, preventing CORS issues.*
+*Vite is configured to proxy API requests to the backend, avoiding CORS issues during local development.*
 
----
+## 🔐 Environment Variables
 
-## 🚀 Unified Production Deployment (Single-Deploy)
+Create a `.env` file in the `backend` directory with the following variables:
 
-In production, the React frontend and Flask API are designed to run together as a **single, consolidated web service**. This eliminates the need for separate hosting and completely resolves cross-origin resource sharing (CORS) concerns.
+```env
+# Flask Application Secret Key for signing auth tokens
+SECRET_KEY=your_secure_random_string_here
 
-### How it works:
-1. **Build the Frontend**: Compile the React SPA into static assets:
-   ```bash
-   npm run build:frontend
-   ```
-   This generates the compiled code inside `frontend/dist/`.
+# Allowed origins for CORS (Optional)
+FRONTEND_URL=http://localhost:5173
 
-2. **Serve from Backend**: Start the Flask backend in production mode:
-   ```bash
-   # Using standard runner:
-   npm run dev:backend
-   
-   # Or using gunicorn (on production Linux servers):
-   npm run start:backend
-   ```
-   Flask automatically detects the `frontend/dist` directory and serves the compiled static files at the root domain (`/`), while maintaining all `/api` endpoints.
+# Port for the Flask server (Optional)
+PORT=5000
 
----
+# Enable or disable Flask debug mode (true/false)
+FLASK_DEBUG=true
+```
 
-## 🎛️ Scripts Reference
+## 💡 Usage
+1. **Register an account**: Navigate to the web application and create a new account.
+2. **Dashboard**: Log in to access the main dashboard.
+3. **Single Transaction Check**: Enter transaction details (amount, time, category, etc.) in the manual entry form to get an instant fraud prediction.
+4. **Batch Processing**: Navigate to the upload section and submit a CSV file containing multiple transactions for bulk analysis.
 
-All operations can be managed directly from the root folder:
+## 📸 Screenshots
 
-| Command | Action |
-|:---|:---|
-| `npm run install:all` | Installs npm and pip dependencies. |
-| `npm run dev` | Runs both the Vite frontend and Flask backend concurrently. |
-| `npm run dev:frontend` | Runs the Vite frontend only. |
-| `npm run dev:backend` | Runs the Flask backend only. |
-| `npm run build:frontend`| Compiles the React SPA production bundle. |
-| `npm run start:backend` | Starts the backend using Gunicorn (production environment). |
+> **Note:** Screenshots will be added here. 
+> 
+> *(Suggested: Add 1 screenshot of the login screen, 1 of the main dashboard with ECharts, and 1 of the specific XAI explanation component)*
 
----
+*Placeholder for Dashboard Screenshot*
+`![Dashboard Preview](docs/dashboard-preview.png)`
 
-## 🛡️ License
-Class project workspace for Fraud Detection ML. Made with love and modern web design principles.
+*Placeholder for Prediction Result Screenshot*
+`![Prediction Result](docs/prediction-result.png)`
+
+## 🔮 Future Improvements
+- **Asynchronous Processing**: Implement Celery and Redis to handle extremely large batch CSV uploads asynchronously without blocking the main thread.
+- **Model Retraining Pipeline**: Build an automated pipeline to periodically retrain the model with new user-validated data to mitigate model drift.
+- **PostgreSQL Migration**: Migrate from SQLite to PostgreSQL for robust production-level database management and concurrency.
+- **Dockerization**: Containerize both the frontend and backend using Docker and Docker Compose for easier environment replication and deployment.
+
+## 🧠 Learning Outcomes
+Building and exploring this project provides practical experience in:
+- Integrating Machine Learning models into a traditional REST API.
+- Implementing Explainable AI (XAI) to translate raw probabilities into actionable business insights.
+- Securing web applications with custom authentication schemes and rate limiting.
+- Managing a monorepo setup running both Node.js and Python ecosystems concurrently.
+- Designing responsive, data-rich user interfaces using React and ECharts.
+
+## 📄 License
+This project is licensed under the MIT License.
