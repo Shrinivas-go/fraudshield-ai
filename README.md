@@ -129,15 +129,25 @@ FLASK_DEBUG=true
 
 ## 📸 Screenshots
 
-> **Note:** Screenshots will be added here. 
-> 
-> *(Suggested: Add 1 screenshot of the login screen, 1 of the main dashboard with ECharts, and 1 of the specific XAI explanation component)*
+Here is a glimpse of the FraudShield AI interface in action:
 
-*Placeholder for Dashboard Screenshot*
-`![Dashboard Preview](docs/dashboard-preview.png)`
+### Dashboard & Analysis
+![Analyze Transactions](docs/analyze-transactions.png)
+*Real-time fraud prediction with explainable AI breakdowns.*
 
-*Placeholder for Prediction Result Screenshot*
-`![Prediction Result](docs/prediction-result.png)`
+### Authentication
+![Sign In Modal](docs/sign-in.png)
+*Secure, token-based authentication system.*
+
+### Landing Page & Features
+![Hero Section](docs/hero-section.png)
+*Modern, responsive landing page.*
+
+![How It Works](docs/how-it-works.png)
+*Clear 3-step pipeline explanation.*
+
+![The Story](docs/story-comic.png)
+*Interactive comic strip illustrating the importance of fraud prevention.*
 
 ## 🔮 Future Improvements
 - **Asynchronous Processing**: Implement Celery and Redis to handle extremely large batch CSV uploads asynchronously without blocking the main thread.
