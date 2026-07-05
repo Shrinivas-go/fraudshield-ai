@@ -48,7 +48,23 @@
 ## 🏗️ Architecture
 The system follows a standard modern client-server architecture with an integrated ML inference pipeline.
 
-**User → React Frontend → REST API (Flask) → Feature Engineering → Random Forest Model (scikit-learn) → Response with Explainability → React Dashboard**
+```mermaid
+graph TD
+    User(["👤 User"]) -->|"User access (HTTP/S)"| Frontend
+    
+    Frontend["⚛️ React Frontend<br/>Single Page Application (SPA)<br/>UI rendering, API client"]
+    
+    Frontend -->|"REST API Requests (JSON)"| Backend
+    
+    Backend["🧪 Python Flask Backend<br/>API Endpoints,<br/>Business Logic, Auth, Routing"]
+    
+    Backend -->|"Data Persistence"| DB
+    Backend -->|"Model Inference/Predictions"| ML
+    
+    DB[/"🗄️ SQLite Database<br/>Local Data Storage,<br/>Application Data"\]
+    
+    ML["🤖 Machine Learning Model (Random Forest)<br/>Trained model, Predicts outcomes,<br/>Scikit-learn"]
+```
 
 1. The user authenticates and submits transaction data via the React frontend.
 2. The Flask backend validates the input and rate-limits the request if necessary.
