@@ -163,6 +163,7 @@ Here is a glimpse of the FraudShield AI interface in action:
 *Clear 3-step pipeline explanation.*
 
 ![The Story](docs/story-comic.png)
+
 *Interactive comic strip illustrating the importance of fraud prevention.*
 
 ## 🔮 Future Improvements
