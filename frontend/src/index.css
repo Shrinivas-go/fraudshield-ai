@@ -111,24 +111,62 @@ body {
 .animation-delay-300 { animation-delay: 300ms; }
 .animation-delay-400 { animation-delay: 400ms; }
 
-/* ── Engine Status pill animations ─────────────────────── */
-@keyframes engineSlideIn {
+/* ── Engine Status card animations ─────────────────────── */
+@keyframes engineCardFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes engineCardSlideUp {
   from {
     opacity: 0;
-    transform: translateY(20px) scale(0.92);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
-@keyframes engineCheckDraw {
+@keyframes engineProgress {
+  0% {
+    width: 0%;
+    margin-left: 0%;
+  }
+  50% {
+    width: 60%;
+    margin-left: 20%;
+  }
+  100% {
+    width: 0%;
+    margin-left: 100%;
+  }
+}
+
+@keyframes enginePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes engineMessageFade {
   from {
-    stroke-dashoffset: 20;
+    opacity: 0;
+    transform: translateY(4px);
   }
   to {
-    stroke-dashoffset: 0;
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes engineOnlinePop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
